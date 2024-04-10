@@ -1,0 +1,3 @@
+on user not found, phone should vibrate
+if 1-10 selected, user cannot enter outside range (show message if outside range)
+max is 12
