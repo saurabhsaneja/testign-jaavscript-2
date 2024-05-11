@@ -176,8 +176,6 @@ const ScreenGenie = ({ route, navigation, screen }) => {
       fetchDataAsync(el)
     }
     );
-    console.log('sectionsData', sectionsData);
-    return sectionsData
   };
 
   const fetchDataAsync = async (
