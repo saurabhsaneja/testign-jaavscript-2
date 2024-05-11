@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { Component } from 'react';
 import { useState, useEffect } from "react";
@@ -90,7 +91,6 @@ const articleMap = {
 
 
 const TagsSection = ({ navigation, meta, data }) => {
-  console.log('TagsSection navigation, meta, data', navigation, meta, data);
   const [tags, setTags] = useState(data? data:[]);
   const [tagsList, setTagsList] = useState([])
   const [tagScreen, setTagScreen] = useState(null)
@@ -137,7 +137,7 @@ export default TagsSection;
 
 
 
-const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
+const CATEGORYSELECTION = ({ navigation, route }) => {
   const [screen, setScreen] = useState([]);
   const [objects, setObjects] = useState([]);
   const [selectedObjects, setSelectedObjects] = useState([]);
@@ -146,7 +146,6 @@ const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
   const { updateOnBoardingStatus, screens, adminSections, user } = useContext(onBoardingContext)
   const [formStatus, setFormStatus] = useState('आगे बढिये')
   const [iconMap, setIconMap] = useState([])
-  const [hideNextButton, setHideNextButton] = useState(initiallyHideNextButton === 'yes')
   // console.log("CategorySelction")
 
   const CategoryItem = ({ index, object, onClick, selectedObjects}) => {
@@ -268,7 +267,7 @@ const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
           prettyName: item.prettyName,
           slug: item.slug,
           name: item.name,
-          userID: user?.attributes?.sub || user?.signInUserSession?.idToken?.payload?.sub,
+          userID: user.attributes.sub,
           visible: true,
           sectionType: item.sectionType
         }))
@@ -280,16 +279,6 @@ const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
       console.error('Error:', error);
     }
   };
-
-  const shouldShowNextButton = () => {
-    if(!hideNextButton){
-      return true
-    } else if(selectedObjects?.length < 5){
-      return false
-    } else if (selectedObjects?.length >= 5) {
-      return true
-    }
-  }
 
   useEffect(() => {
     //Set the first screen for configuration
@@ -349,20 +338,19 @@ const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
         contentContainerStyle={styles.sectionsFlatListContent}
         numColumns={2}
       />
-      {shouldShowNextButton() ?
-        <TouchableOpacity
-          onPress={() => {
-            setButtonClicked(true);
-            saveObjects();
-          }}
-          style={[styles.next, styles.nextLayout]}
-          disabled={(buttonClicked)}
-        >
-          <View style={[styles.buttonBase, styles.nextLayout]}>
-            <Text style={[styles.text1button, styles.textTypoButton]}>{formStatus}</Text>
-          </View>
-        </TouchableOpacity>
-      :null}
+      <TouchableOpacity
+        // key={}
+        onPress={() => {
+          setButtonClicked(true);
+          saveObjects();
+        }}
+        style={[styles.next, styles.nextLayout]}
+        disabled={(buttonClicked)}
+      >
+        <View style={[styles.buttonBase, styles.nextLayout]}>
+          <Text style={[styles.text1button, styles.textTypoButton]}>{formStatus}</Text>
+        </View>
+      </TouchableOpacity>
       {/* <Pressable style={[styles.next, styles.nextLayout]} onPress={() => {saveObjects}}>
         <View style={[styles.buttonBase, styles.nextLayout]}>
           <Text style={[styles.text1, styles.textTypo]}>आगे बढिये</Text>
@@ -454,14 +442,13 @@ const PHOTOCOLLECTION = ({ navigation, meta, data ,relatedScreen}) => {
 
 
 
-const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
+const INTERESTSELECTION = ({ navigation, route }) => {
   const [objects, setObjects] = useState([]);
   const [selectedObjects, setSelectedObjects] = useState([]);
   const [formStatus, setFormStatus] = useState('आगे बढिये')
   const { updateOnBoardingStatus, screens, adminSections, user } = useContext(onBoardingContext)
   const [iconMap,setIconMap] = useState([])
   const [buttonClicked, setButtonClicked] = useState(false);
-  const [hideNextButton, setHideNextButton] = useState(initiallyHideNextButton === 'yes')
   const iconMapper = async (objects) => {
     let mappr; // Declare mappr in the outer scope  
     try {
@@ -550,7 +537,7 @@ const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
         await DataStore.save(new Interest({
           prettyName: item.prettyName,
           name: item.name,
-          userID: user?.attributes?.sub || user?.signInUserSession?.idToken?.payload?.sub,
+          userID: user.attributes.sub,
         }))
       }
       updateOnBoardingStatus()
@@ -560,15 +547,6 @@ const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
       console.error('Error:', error);
     }
   };
-  const shouldShowNextButton = () => {
-    if(!hideNextButton){
-      return true
-    } else if(selectedObjects?.length < 5){
-      return false
-    } else if (selectedObjects?.length >= 5) {
-      return true
-    }
-  }
 
   useEffect(() => {
     const fetchMasterInterests = async () => {
@@ -621,17 +599,16 @@ const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
         contentContainerStyle={styles.sectionsFlatListContent}
         numColumns={3}
       />
-      {shouldShowNextButton() ?
-        <TouchableOpacity
-          onPress={saveObjects}
-          disabled={buttonClicked}
-          style={[styles.next, styles.nextLayout]}
-        >
-          <View style={[styles.buttonBase, styles.nextLayout]}>
-            <Text style={[styles.text1button, styles.textTypoButton]}>{formStatus}</Text>
-          </View>
-        </TouchableOpacity>
-      :null}
+      <TouchableOpacity
+        // key={}
+        onPress={saveObjects}
+        disabled={buttonClicked}
+        style={[styles.next, styles.nextLayout]}
+      >
+        <View style={[styles.buttonBase, styles.nextLayout]}>
+          <Text style={[styles.text1button, styles.textTypoButton]}>{formStatus}</Text>
+        </View>
+      </TouchableOpacity>
       {/* <Pressable style={[styles.next, styles.nextLayout]} onPress={() => {saveObjects}}>
         <View style={[styles.buttonBase, styles.nextLayout]}>
           <Text style={[styles.text1, styles.textTypo]}>आगे बढिये</Text>
@@ -744,7 +721,7 @@ const STATESELECTION = ({ navigation, route }) => {
         await DataStore.save(new Interest({
           prettyName: item.prettyName,
           name: item.name,
-          userID: user?.attributes?.sub || user?.signInUserSession?.idToken?.payload?.sub,
+          userID: user.attributes.sub,
         }))
       }
       updateOnBoardingStatus()
@@ -1122,28 +1099,14 @@ const VERTICALLISTUNORDERED = ({ navigation, meta, data,relatedScreen }) => {
   //   "bollywood-news": "Bollywood",
   //   ""
   // }
-  const renderItem = ({item, index}) => {
-    return (
-      <HorizontalFragment item={item} index={index} key={item.id} navigation={navigation}></HorizontalFragment>
-    )
-  }
   if(!data) data = []
   return (
     (data.length !== 0 && <View style={{ paddingVertical: 20 }}>
       <SectionHeader title={meta.item.prettyName} navigation={navigation}  relatedScreen={relatedScreen}/>
-      {/* {data.map((item, index) => (
+      {data.map((item, index) => (
         <HorizontalFragment item={item} index={index} key={item.id} navigation={navigation}></HorizontalFragment>
       ))
-      } */}
-      <FlatList
-        data={data}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        initialNumToRender={5}
-      />
-      {relatedScreen?.pagination ?
-        <Text style={styles.headlineAstro}>pagination</Text> 
-      :null}
+      }
     </View>)
   )
 }

@@ -44,9 +44,9 @@ import PhotoShow from "../screens/PhotoShow";
 import { WebView } from 'react-native-webview';
 import DatePicker from 'react-native-modern-datepicker';
 import moment from "moment";
-
+import LoadMore from "./LoadMore";
 // import { getToday, getFormatedDate } from 'react-native-modern-datepicker';
-
+import { gql } from '@apollo/client';
 
 const deviceHeight = Dimensions.get('window').height;
 const deviceWidth = Dimensions.get('window').width;
@@ -90,7 +90,6 @@ const articleMap = {
 
 
 const TagsSection = ({ navigation, meta, data }) => {
-  console.log('TagsSection navigation, meta, data', navigation, meta, data);
   const [tags, setTags] = useState(data? data:[]);
   const [tagsList, setTagsList] = useState([])
   const [tagScreen, setTagScreen] = useState(null)
@@ -137,17 +136,26 @@ export default TagsSection;
 
 
 
-const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
+const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton, gotoNextOnboardScreen }) => {
   const [screen, setScreen] = useState([]);
   const [objects, setObjects] = useState([]);
   const [selectedObjects, setSelectedObjects] = useState([]);
   const [buttonClicked, setButtonClicked] = useState(false);
   const [buttonStatus, setButtonStatus] = useState(false);
-  const { updateOnBoardingStatus, screens, adminSections, user } = useContext(onBoardingContext)
+  const { updateOnBoardingStatus, screens, adminSections, user, fetchUserSections } = useContext(onBoardingContext)
   const [formStatus, setFormStatus] = useState('आगे बढिये')
   const [iconMap, setIconMap] = useState([])
   const [hideNextButton, setHideNextButton] = useState(initiallyHideNextButton === 'yes')
   // console.log("CategorySelction")
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setFormStatus('आगे बढिये')
+      setButtonClicked(false)
+    });
+    // Return the function to unsubscribe from the event so it gets removed on unmount
+    return unsubscribe;
+  }, [navigation]);
 
   const CategoryItem = ({ index, object, onClick, selectedObjects}) => {
     // console.log (iconMap) 
@@ -257,28 +265,7 @@ const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
   const saveObjects = async () => {
     setButtonClicked(true);
     setFormStatus(<ActivityIndicator color='#000'  size="small"/>)
-    try {
-      for (const objectId of selectedObjects) {
-        const objectIndex = objects.findIndex((obj) => obj.id === objectId);
-        const item = objects[objectIndex]
-        await DataStore.save(new Section({
-          screenID: screen.id,
-          viewComponent: item.viewComponent,
-          sortPriority: item.sortPriority,
-          prettyName: item.prettyName,
-          slug: item.slug,
-          name: item.name,
-          userID: user?.attributes?.sub || user?.signInUserSession?.idToken?.payload?.sub,
-          visible: true,
-          sectionType: item.sectionType
-        }))
-      }
-      updateOnBoardingStatus()
-      setSelectedObjects([]);
-      setObjects([...objects]);
-    } catch (error) {
-      console.error('Error:', error);
-    }
+    updateOnBoardingStatus()
   };
 
   const shouldShowNextButton = () => {
@@ -302,6 +289,7 @@ const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
         s.visible.eq(true)
       );
       setObjects(masterSections);
+      console.log('setObjects', masterSections);
       if (masterSections.length !== 0) {
         const iconMap = await iconMapper(masterSections); // Await the async function
         setIconMap(iconMap);
@@ -354,6 +342,7 @@ const CATEGORYSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
           onPress={() => {
             setButtonClicked(true);
             saveObjects();
+            gotoNextOnboardScreen({selectedUserSectionObjects:selectedObjects, userSectionObjects: objects});
           }}
           style={[styles.next, styles.nextLayout]}
           disabled={(buttonClicked)}
@@ -454,7 +443,7 @@ const PHOTOCOLLECTION = ({ navigation, meta, data ,relatedScreen}) => {
 
 
 
-const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
+const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton, gotoNextOnboardScreen, selectedUserSectionObjects, userSectionObjects }) => {
   const [objects, setObjects] = useState([]);
   const [selectedObjects, setSelectedObjects] = useState([]);
   const [formStatus, setFormStatus] = useState('आगे बढिये')
@@ -479,6 +468,15 @@ const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
     // console.log(mappr); // Now you can access mappr in the outer scope
     return mappr;
   };
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setFormStatus('आगे बढिये')
+      setButtonClicked(false)
+    });
+    console.log('route?.params?.selectedUserSectionObjects', route?.params?.selectedUserSectionObjects);
+    // Return the function to unsubscribe from the event so it gets removed on unmount
+    return unsubscribe;
+  }, [navigation]);
 
   const InterestItem = ({ index, object, onClick, selectedObjects }) => {
     const [isActive, setIsActive] = useState(false)
@@ -543,22 +541,8 @@ const INTERESTSELECTION = ({ navigation, route, initiallyHideNextButton }) => {
   const saveObjects = async () => {
     setButtonClicked(true);
     setFormStatus(<ActivityIndicator color='#000' size="small"/>)
-    try {
-      for (const objectId of selectedObjects) {
-        const objectIndex = objects.findIndex((obj) => obj.id === objectId);
-        const item = objects[objectIndex]
-        await DataStore.save(new Interest({
-          prettyName: item.prettyName,
-          name: item.name,
-          userID: user?.attributes?.sub || user?.signInUserSession?.idToken?.payload?.sub,
-        }))
-      }
-      updateOnBoardingStatus()
-      setSelectedObjects([]);
-      setObjects([...objects]);
-    } catch (error) {
-      console.error('Error:', error);
-    }
+    updateOnBoardingStatus()
+    gotoNextOnboardScreen({selectedInterestObjects:selectedObjects, interestObjects: objects,selectedUserSectionObjects, userSectionObjects});
   };
   const shouldShowNextButton = () => {
     if(!hideNextButton){
@@ -1113,7 +1097,10 @@ const BreakingFragment = ({ item, index, navigation }) => {
 }
 
 
-const VERTICALLISTUNORDERED = ({ navigation, meta, data,relatedScreen }) => {
+const VERTICALLISTUNORDERED = ({ navigation, meta, data,relatedScreen, isPaginationScreen }) => {
+  const [sectionData, setSectionData] = useState(data);
+  const [isLoading, setIsLoading] = useState(false); 
+  const [showLoadMoreButton, setShowLoadMoreButton] = useState(isPaginationScreen);
   // const navigation = useNavigation();
   // const onPress = () => {
   //   navigation.navigate('Article'); 
@@ -1122,6 +1109,89 @@ const VERTICALLISTUNORDERED = ({ navigation, meta, data,relatedScreen }) => {
   //   "bollywood-news": "Bollywood",
   //   ""
   // }
+  const loadMore = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetchStoriesByCategory();
+      // if data length is less than limit variable value in query, that means all data is fetched 
+      if(response?.data?.storiesByCategory?.length < 5){
+        setShowLoadMoreButton(false)
+      }
+      console.log('fetchStoriesByCategory response', [...sectionData, ...response?.data?.storiesByCategory]);
+      if(response?.data?.storiesByCategory?.length){
+        setSectionData([...sectionData, ...response?.data?.storiesByCategory])
+      }
+    } catch (error) {
+      console.log('error fetchStoriesByCategory', error);
+    }
+    setIsLoading(false)
+  }
+  const fetchStoriesByCategory = React.useCallback(async () => {
+    try {
+        let query = ` query($channel_id:Int, $skip:Int, $slug:String!`;
+        let query1 = ``;
+        let variable = { channel_id: 2, skip: sectionData?.length, slug: meta?.item?.slug };
+        
+        query1 =
+                query1 +
+                `storiesByCategory(slug:$slug, limit: 5,channel_id:$channel_id, skip: $skip) {
+                        id
+                        title
+                        description
+                        featured_image_by_sizes
+                        type_id {
+                            id
+                            name
+                        }
+                        slug
+                        permalink
+                        location_id {
+                            name_lng
+                        }
+                        category_id {
+                            id
+                            name_lng
+                        }
+                        content_type_id{
+                            name
+                            slug
+                        }
+                        location_id{
+                            name
+                            name_lng
+                        }
+                        story_location_city_id{
+                            name
+                            name_lng
+                        }
+                        category_slug
+                        published_date
+                        author_ids{id  first_name_lng last_name_lng photo  slug}
+                        body_id{
+                            id
+                            featured_image_properties
+                            featured_image
+                            live_blog_list
+                            live_blog_title
+                        }
+                    }`;
+        
+        // console.log(dataFetchList)
+        let finalquery = `${query}){${query1} }`;
+        console.log('finalquery', finalquery);
+        console.log('variable', variable);
+        // console.log(finalquery)
+        const storiesByCategory = await client.query({
+            query: gql(finalquery),
+            variables: variable,
+        });
+        // batchDataUpdate(storiesByCategory)
+        return storiesByCategory
+    } catch (error) {
+        console.log("Error", error)
+        return {}
+    }
+  })
   const renderItem = ({item, index}) => {
     return (
       <HorizontalFragment item={item} index={index} key={item.id} navigation={navigation}></HorizontalFragment>
@@ -1130,19 +1200,22 @@ const VERTICALLISTUNORDERED = ({ navigation, meta, data,relatedScreen }) => {
   if(!data) data = []
   return (
     (data.length !== 0 && <View style={{ paddingVertical: 20 }}>
-      <SectionHeader title={meta.item.prettyName} navigation={navigation}  relatedScreen={relatedScreen}/>
+      <SectionHeader title={meta.item.prettyName} navigation={navigation}  relatedScreen={relatedScreen} isPaginationScreen={isPaginationScreen}/>
       {/* {data.map((item, index) => (
         <HorizontalFragment item={item} index={index} key={item.id} navigation={navigation}></HorizontalFragment>
       ))
       } */}
       <FlatList
-        data={data}
+        data={sectionData}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         initialNumToRender={5}
       />
-      {relatedScreen?.pagination ?
-        <Text style={styles.headlineAstro}>pagination</Text> 
+      {showLoadMoreButton ?
+      <>
+        <LoadMore onPress={loadMore} />
+        {isLoading && <ActivityIndicator color='#000'  size="large"/>} 
+      </>
       :null}
     </View>)
   )
@@ -1259,21 +1332,21 @@ const AstrologySection = ({ navigation, story }) => {
   );
 }
 
-const DOBSELECTION = ({ navigation, meta }) => {
+const DOBSELECTION = ({ navigation, route,  meta, gotoNextOnboardScreen, selectedUserSectionObjects, userSectionObjects, selectedInterestObjects, interestObjects }) => {
   const [selectedDate, setSelectedDate] = useState('');
   const [formStatus, setFormStatus] = useState('आगे बढिये')
   const { updateOnBoardingStatus, user, userPreferences } = useContext(onBoardingContext)
+  console.log('DOBSELECTION', {selectedUserSectionObjects, userSectionObjects, selectedInterestObjects, selectedDate});
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setFormStatus('आगे बढिये')
+    });
+    console.log('route?.params?.selectedUserSectionObjects', route?.params?.selectedUserSectionObjects);
+    // Return the function to unsubscribe from the event so it gets removed on unmount
+    return unsubscribe;
+  }, [navigation]);
   const saveDOB = async () => {
-    try {
-      const updatedUserPreference = await DataStore.save(
-        UserPreferences.copyOf(userPreferences[0], updated => {
-          updated.dob = selectedDate
-        }))
-      // console.log(updatedUserPreference)
-      updateOnBoardingStatus()
-    } catch (error) {
-      console.error('Error:', error);
-    }
+    gotoNextOnboardScreen({selectedUserSectionObjects, userSectionObjects, selectedInterestObjects, selectedDate, interestObjects});
   }
 
   const formattedDateTime = (date) => {
@@ -1343,11 +1416,12 @@ const DOBSELECTION = ({ navigation, meta }) => {
   );
 };
 
-const LOCATIONSELECTION = ({ navigation, meta, stories }) => {
+const LOCATIONSELECTION = ({ navigation, route, meta, stories, selectedUserSectionObjects, userSectionObjects, selectedInterestObjects, interestObjects, selectedDate, gotoNextOnboardScreen }) => {
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [formStatus, setFormStatus] = useState('आगे बढिये')
-  const { updateOnBoardingStatus, user, userPreferences } = useContext(onBoardingContext)
+  const { updateOnBoardingStatus, user, userPreferences, setIsOnBoardingCompleted, screens } = useContext(onBoardingContext)
   useEffect(() => {
+    console.log('LOCATIONSELECTION interestObjects', interestObjects);
     GetLocation.getCurrentPosition({
       enableHighAccuracy: true,
       timeout: 60000,
@@ -1385,9 +1459,68 @@ const LOCATIONSELECTION = ({ navigation, meta, stories }) => {
         UserPreferences.copyOf(userPreferences[0], updated => {
           updated.locationID = selectedLocation
         }))
-      // console.log(updatedUserPreference)
-      updateOnBoardingStatus()
+        saveUserObjects()
+          .then(r => {
+            saveInterestObjects().then(r1 => {
+              saveDOB().then(r3 => {
+                updateOnBoardingStatus();
+              })
+            }).catch((e) => {
+              console.error(e.message); // "oh, no!"
+            })
+          })
+          .catch((e) => {
+            console.error(e.message); // "oh, no!"
+          })
+        
+        // setIsOnBoardingCompleted(true);
     } catch (error) {
+      console.error('Error:', error);
+    }
+  }
+  const saveUserObjects = async () => {
+    try {
+      for (const objectId of selectedUserSectionObjects) {
+        const objectIndex = userSectionObjects.findIndex((obj) => obj.id === objectId);
+        const item = userSectionObjects[objectIndex]
+        await DataStore.save(new Section({
+          screenID: screens.find(id => id.name === 'home').id,
+          viewComponent: item.viewComponent,
+          sortPriority: item.sortPriority,
+          prettyName: item.prettyName,
+          slug: item.slug,
+          name: item.name,
+          userID: user?.attributes?.sub || user?.signInUserSession?.idToken?.payload?.sub,
+          visible: true,
+          sectionType: item.sectionType
+        }))
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  }
+  const saveInterestObjects = async () => {
+    try {
+      for (const objectId of selectedInterestObjects) {
+        const objectIndex = interestObjects.findIndex((obj) => obj.id === objectId);
+        const item = interestObjects[objectIndex]
+        await DataStore.save(new Interest({
+          prettyName: item.prettyName,
+          name: item.name,
+          userID: user?.attributes?.sub || user?.signInUserSession?.idToken?.payload?.sub,
+        }))
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  }
+  const saveDOB = async () => {
+    try {
+      const updatedUserPreference = await DataStore.save(
+        UserPreferences.copyOf(userPreferences[0], updated => {
+          updated.dob = selectedDate
+        }))
+      } catch (error) {
       console.error('Error:', error);
     }
   }
